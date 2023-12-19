@@ -294,7 +294,10 @@ def oneuser(user_id):
                             "exported"              : oneuser["exported"],
                             "storage_used"          : oneuser["storage_used"],
                             "registration_date"     : oneuser["registration_date"],
-                            "registration_approval" : oneuser["registration_approval"]
+                            "registration_approval" : oneuser["registration_approval"],
+                            "credits_requested" :     oneuser["credits_requested"],
+                            "update_status" :     oneuser["update_status"],
+                            
                             }
             return jsonify(user_data)
     
@@ -370,6 +373,8 @@ def updateprofile():
 
     db = get_database()
 
+    db.execute("update users set update_status = 'pending' WHERE user_id = ?", [user_id])
+
     user_cursor = db.execute("SELECT * FROM users_updates WHERE user_id = ?", [user_id])
     user = user_cursor.fetchone()
 
@@ -383,8 +388,123 @@ def updateprofile():
     db.commit()
     return jsonify({"Message - " : "Prfile update initiation is successfull."})
 
+
+@app.route("/updaterequesteduser/<int:user_id>" , methods = ["PUT"])
+def updaterequesteduser(user_id):
+    new_user_data         = request.get_json()
+    full_name             = new_user_data["full_name"]
+    email                 = new_user_data["email"]
+    phone                 = new_user_data["phone"]
+    institution_organization= new_user_data["institution_organization"]
+    research_department   = new_user_data["research_department"]
+    project_incharge_name = new_user_data["project_incharge_name"]
+    address               = new_user_data["address"]
+    country               = new_user_data["country"]
+   
+
+
+    db = get_database()
+
+    db.execute("update users set full_name = ?, email = ?, phone = ?, institution_organization = ?, address = ?, country = ?,research_department = ?, project_incharge_name = ?, update_status = 'approved' where user_id = ?",[full_name,  email, phone , institution_organization, address , country ,research_department , project_incharge_name,user_id])
+    
+    db.commit()
+    return jsonify({"Message - " : "Prfile update successfull."})
+
+
+
+@app.route("/showupdaterequestedusers" , methods = ["GET"])
+def showupdaterequestedusers():
+    allusers = None
+    db = get_database()
+    user_cursor = db.execute("select * from users_updates")
+    allusers = user_cursor.fetchall()
+    final_result = []
+    for eachuser in allusers:
+        user_dict = {}
+        user_dict["user_id"]     =     eachuser["user_id"]
+        user_dict["full_name"]   =     eachuser["full_name"]
+        user_dict["password"]    =     eachuser["password"]
+        user_dict["email"]       =     eachuser["email"]
+        user_dict["phone"]       =     eachuser["phone"]
+        user_dict["institution_organization"] =  eachuser["institution_organization"]
+        user_dict["address"]       =     eachuser["address"]
+        user_dict["country"]       =     eachuser["country"]
+        user_dict["research_department"]       =     eachuser["research_department"]
+        user_dict["project_incharge_name"]     =     eachuser["project_incharge_name"]
+        final_result.append(user_dict) 
+    return jsonify(final_result)
+
+@app.route("/showupdaterequestedusersbyid/<int:user_id>" , methods = ["GET"])
+def showupdaterequestedusersbyid(user_id):
+    userdata = None
+    db = get_database()
+    user_cursor = db.execute("select * from users_updates where user_id = ?", [user_id])
+    userdata = user_cursor.fetchone()
+    user_dict = {
+       "user_id"    :     userdata["user_id"],
+       "full_name"  :     userdata["full_name"],
+       "password"   :     userdata["password"],
+       "email"      :     userdata["email"],
+       "phone"      :     userdata["phone"],
+       "institution_organization":  userdata["institution_organization"],
+       "address"      :     userdata["address"],
+       "country"      :     userdata["country"],
+       "research_department"      :     userdata["research_department"],
+       "project_incharge_name"    :     userdata["project_incharge_name"]
+    }
+    return jsonify(user_dict)
+
 #working
 # function to insert a new user into the api
+@app.route("/buycredits/<int:user_id>" , methods = ["PUT"])
+def buycredits(user_id):
+    db = get_database()
+    db.execute("update users set credits_requested = 1 where user_id = ?",[user_id])
+    db.commit()
+    return jsonify({"Message - " : "Request Sent Succesfully"})
+
+# function to insert a new user into the api
+@app.route("/addcredits/<int:user_id>" , methods = ["PUT"])
+def addcredits(user_id):
+    selectedCredits         = request.get_json()
+    credits             = selectedCredits["credits"]
+    db = get_database()
+    db.execute("update users set credits_remaining = credits_remaining + ? where user_id = ?",[credits, user_id])
+    db.execute("update users set credits_requested = 0 where user_id = ?",[user_id])
+    db.commit()
+    return jsonify({"Message - " : "Credits Added Succesfully"})
+
+@app.route("/creditsrequestedusers" , methods = ["GET"])
+def creditsrequestedusers():
+    allusers = None
+    db = get_database()
+    user_cursor = db.execute("select * from users where credits_requested = 1")
+    allusers = user_cursor.fetchall()
+    final_result = []
+    for eachuser in allusers:
+        user_dict = {}
+        user_dict["user_id"]     =     eachuser["user_id"]
+        user_dict["full_name"]   =     eachuser["full_name"]
+        user_dict["username"]    =     eachuser["username"]
+        user_dict["password"]    =     eachuser["password"]
+        user_dict["email"]       =     eachuser["email"]
+        user_dict["phone"]       =     eachuser["phone"]
+        user_dict["institution_organization"] =  eachuser["institution_organization"]
+        user_dict["address"]       =     eachuser["address"]
+        user_dict["country"]       =     eachuser["country"]
+        user_dict["research_department"]       =     eachuser["research_department"]
+        user_dict["project_incharge_name"]     =     eachuser["project_incharge_name"]
+        user_dict["project_count"]       =     eachuser["project_count"]
+        user_dict["samples_count"]       =     eachuser["samples_count"]
+        user_dict["credits_remaining"]       =     eachuser["credits_remaining"]
+        user_dict["exported"]       =     eachuser["exported"]
+        user_dict["storage_used"]       =     eachuser["storage_used"]
+        user_dict["registration_date"]       =     eachuser["registration_date"]
+        user_dict["registration_approval"]       =     eachuser["registration_approval"]
+        user_dict["update_status"]       =     eachuser["update_status"]
+        final_result.append(user_dict) 
+    return jsonify(final_result)
+
 @app.route("/insertuser" , methods = ["POST"])
 def insertuser():
     new_user_data         = request.get_json()
@@ -415,7 +535,6 @@ def insertuser():
     db.execute("insert into users (full_name, username,password , email, phone , institution_organization, address , country ,research_department , project_incharge_name,project_count, samples_count ,credits_remaining , exported, storage_used , registration_date, registration_approval) values (?,?, ?,? ,? ,? ,?, ?, ?, ?, ?, ? ,?, ?, ?,?,?)",[full_name, username,password , email, phone , institution_organization, address , country ,research_department , project_incharge_name,project_count, samples_count ,credits_remaining , exported, storage_used , registration_date, registration_approval])
     db.commit()
     return jsonify({"Message - " : "User successfully inserted."})
-
 
 
 # function to register the user. 
@@ -1018,7 +1137,25 @@ def showallcredithistory():
         final_result.append(credithistory_dict)
     return jsonify(final_result)
 
-
+@app.route("/usercredithistory/<int:user_id>", methods=["GET"])
+def usercredithistory(user_id):
+    usercredithistory = None
+    db = get_database()
+    usercredithistory_cursor = db.execute("SELECT * FROM credit_history WHERE user_id = ? ", [user_id])
+    allusercredithistory = usercredithistory_cursor.fetchall()
+    final_result = []
+    for usercredithistory in allusercredithistory:
+        credithistory_dict = {
+            "transaction_id": usercredithistory["transaction_id"],
+            "user_id": usercredithistory["user_id"],
+            "username": usercredithistory["user_name"],
+            "project_id": usercredithistory["project_id"],
+            "credits_used": usercredithistory["credits_used"],
+            "task": usercredithistory["task"],
+            "date": usercredithistory["date"]
+        }
+        final_result.append(credithistory_dict)
+    return jsonify(final_result)
 
 # showing one creadit history based on user_id, and project_id
 @app.route("/onecredithistory/<int:user_id>/<int:project_id>", methods=["GET"])
