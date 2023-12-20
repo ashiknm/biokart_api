@@ -58,7 +58,6 @@ def refresh():
 @jwt_required(refresh=True)
 def refreshadmin():
     identity = get_jwt_identity()
-    print(identity)
     access_token = create_access_token(identity=identity)
     return jsonify({"accessToken":access_token, "role":identity['role']})
 
@@ -265,7 +264,6 @@ def showunaprrovedusers():
 # function to fetch one user from the database , based on the user_id.
 @app.route("/oneuser/<int:user_id>" , methods = ["GET"])
 def oneuser(user_id):
-
     try:
         oneuser = None
         db = get_database()
@@ -281,6 +279,7 @@ def oneuser(user_id):
                             "full_name"             : oneuser["full_name"],
                             "username"              : oneuser["username"],
                             "password"              : oneuser["password"],
+                            "password" : generate_password_hash(oneuser["password"], method="pbkdf2:sha256"),
                             "email"                 : oneuser["email"],
                             "phone"                 : oneuser["phone"],
                             "institution_organization": oneuser["institution_organization"],
@@ -295,9 +294,8 @@ def oneuser(user_id):
                             "storage_used"          : oneuser["storage_used"],
                             "registration_date"     : oneuser["registration_date"],
                             "registration_approval" : oneuser["registration_approval"],
-                            "credits_requested" :     oneuser["credits_requested"],
-                            "update_status" :     oneuser["update_status"],
-                            
+                            "credits_requested"     : oneuser["credits_requested"],
+                            "update_status"         : oneuser["update_status"],
                             }
             return jsonify(user_data)
     
@@ -406,6 +404,8 @@ def updaterequesteduser(user_id):
     db = get_database()
 
     db.execute("update users set full_name = ?, email = ?, phone = ?, institution_organization = ?, address = ?, country = ?,research_department = ?, project_incharge_name = ?, update_status = 'approved' where user_id = ?",[full_name,  email, phone , institution_organization, address , country ,research_department , project_incharge_name,user_id])
+
+    db.execute("delete from users_updates where user_id = ?",[user_id])
     
     db.commit()
     return jsonify({"Message - " : "Prfile update successfull."})
@@ -670,7 +670,6 @@ def update_user(user_id):
     try:
         new_user_data = request.get_json()
         full_name = new_user_data["full_name"]
-        username = new_user_data["username"]
         password = new_user_data["password"]
         email = new_user_data["email"]
         phone = new_user_data["phone"]
@@ -679,16 +678,17 @@ def update_user(user_id):
         country = new_user_data["country"]
         research_department = new_user_data["research_department"]
         project_incharge_name = new_user_data["project_incharge_name"]
-        project_count = new_user_data["project_count"]
-        samples_count = new_user_data["samples_count"]
-        credits_remaining = new_user_data["credits_remaining"]
-        exported = new_user_data["exported"]
-        storage_used = new_user_data["storage_used"]
-        registration_date = new_user_data["registration_date"]
-        registration_approval = new_user_data["registration_approval"]
 
         db = get_database()
-        db.execute("UPDATE users SET full_name = ?, username = ?, password = ?, email = ?, phone = ?, institution_organization = ?, address = ?, country = ?, research_department = ?, project_incharge_name = ?, project_count = ?, samples_count = ?, credits_remaining = ?, exported = ?, storage_used = ?, registration_date = ?, registration_approval = ? WHERE user_id = ?", [full_name, username, password, email, phone, institution_organization, address, country, research_department, project_incharge_name, project_count, samples_count, credits_remaining, exported, storage_used, registration_date, registration_approval, user_id])
+
+        print("password", password)
+
+        if password:
+            password_hash = generate_password_hash(new_user_data["password"], method="pbkdf2:sha256")
+            db.execute("UPDATE users SET full_name = ?,  password = ?, email = ?, phone = ?, institution_organization = ?, address = ?, country = ?, research_department = ?, project_incharge_name = ? WHERE user_id = ?", [full_name, password_hash, email, phone, institution_organization, address, country, research_department, project_incharge_name, user_id])
+        else:
+            db.execute("UPDATE users SET full_name = ?, email = ?, phone = ?, institution_organization = ?, address = ?, country = ?, research_department = ?, project_incharge_name = ? WHERE user_id = ?", [full_name,  email, phone, institution_organization, address, country, research_department, project_incharge_name, user_id])
+
         db.commit()
 
         return jsonify({"Message": "User Details Successfully Updated."}), 200
