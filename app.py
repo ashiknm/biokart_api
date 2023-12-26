@@ -1383,6 +1383,52 @@ def insertcontactus():
     db.commit()
     return jsonify({"Message": "Contact us entry successfully inserted."})
 
+@app.route("/insertadd", methods=["POST"])
+def insertadd():
+    
+    # Get the uploaded file
+    addImage = request.files.get('addImage')
+    hyperLink = request.form.get('hyperLink')
+
+    status = "uploaded"
+    image_url = None
+
+    if addImage and addImage.filename != '':
+        # filename = os.path.join(app.config['UPLOAD_FOLDER'], upload_screenshot.filename)
+        unique_filename = generate_unique_filename(addImage.filename)
+        addImage.save(os.path.join(app.config['UPLOAD_FOLDER'],unique_filename ))
+        image_url = request.url_root + url_for('static', filename=f'uploads/{unique_filename}')
+    else:
+        image_url = None
+
+
+    db = get_database()
+    db.execute("INSERT INTO addSettings (addImage,hyperlink) VALUES (?, ? )", [image_url, hyperLink])
+    db.commit()
+    return jsonify({"Message": "Add Added Succesfully."})
+
+@app.route("/updateadd/<int:add_id>", methods=["PUT"])
+def updateadd(add_id):
+    
+    # Get the uploaded file
+    addImage = request.files.get('addImage')
+    hyperLink = request.form.get('hyperLink')
+    image_url = None
+
+    if addImage and addImage.filename != '':
+        # filename = os.path.join(app.config['UPLOAD_FOLDER'], upload_screenshot.filename)
+        unique_filename = generate_unique_filename(addImage.filename)
+        addImage.save(os.path.join(app.config['UPLOAD_FOLDER'],unique_filename ))
+        image_url = request.url_root + url_for('static', filename=f'uploads/{unique_filename}')
+    else:
+        image_url = None
+
+
+    db = get_database()
+    db.execute(" UPDATE addSettings SET hyperlink = ?, addImage = COALESCE(?, image_url) where id  = ?", [hyperLink, image_url, add_id])
+    db.commit()
+    return jsonify({"Message": "Add updated Succesfully."})
+
 @app.route("/updateSiteSettings", methods=["PUT"])
 def updatesitesettings():
     companyName = request.form.get('companyName')
