@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, url_for
 from flask_cors import CORS
 from database import get_database
 import sqlite3
@@ -8,6 +8,8 @@ import json
 import os
 import datetime
 from datetime import timedelta
+import uuid
+
 
 from flask_jwt_extended import create_access_token
 from flask_jwt_extended import create_refresh_token
@@ -22,8 +24,9 @@ SECRET_KEY = os.environ.get('SECRET_KEY')
 app = Flask(__name__)
 
 
-
-app.config["JWT_SECRET_KEY"] = SECRET_KEY  # Change this!
+UPLOAD_FOLDER  = 'static/uploads'
+app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER  
+app.config["JWT_SECRET_KEY"] = SECRET_KEY 
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(minutes=15)
 app.config["JWT_REFRESH_TOKEN_EXPIRES"] = timedelta(days=30)
 
@@ -1296,7 +1299,7 @@ def deletefaq(question_id):
 def showallcontactus():
     allcontactus = None
     db = get_database()
-    contactus_cursor = db.execute("SELECT * FROM contact_us where status != 'resolved' ")
+    contactus_cursor = db.execute("SELECT * FROM contact_us where status != 'resolved' ORDER BY contact_date DESC ")
     allcontactus = contactus_cursor.fetchall()
     final_result = []
     for eachcontactus in allcontactus:
@@ -1308,7 +1311,8 @@ def showallcontactus():
             "message": eachcontactus["message"],
             "status": eachcontactus["status"],
             "upload_screenshot": eachcontactus["upload_screenshot"],
-            "contact_date" : eachcontactus["contact_date"]
+            "contact_date" : eachcontactus["contact_date"],
+            "image_url" : eachcontactus["image_url"]
         }
         final_result.append(contactus_dict)
     return jsonify(final_result)
@@ -1343,22 +1347,129 @@ def deletecontactus(user_id):
     db.commit()
     return jsonify({"contact_us": "Contact us record successfully deleted"})
 
-
+def generate_unique_filename(original_filename):
+    # Generate a unique identifier
+    unique_identifier = str(uuid.uuid4())
+    # Extract the file extension from the original filename
+    _, file_extension = os.path.splitext(original_filename)
+    # Construct a unique filename by combining the identifier and original file extension
+    unique_filename = f"{unique_identifier}{file_extension}"
+    return unique_filename
 
 # insert new contact us details into the api_database.
 @app.route("/insertcontactus", methods=["POST"])
 def insertcontactus():
-    new_contactus_data = request.get_json()
-    user_id = new_contactus_data["user_id"]
-    user_name = new_contactus_data["user_name"]
-    subject = new_contactus_data["subject"]
-    message = new_contactus_data["message"]
-    upload_screenshot = new_contactus_data.get("upload_screenshot")
+    user_id = request.form.get('user_id')
+    user_name = request.form.get('user_name')
+    subject = request.form.get('subject')
+    message = request.form.get('message')
+    # Get the uploaded file
+    upload_screenshot = request.files.get('upload_screenshot')
+    filename = None
     status = "uploaded"
+    image_url = None
+
+    if upload_screenshot and upload_screenshot.filename != '':
+        # filename = os.path.join(app.config['UPLOAD_FOLDER'], upload_screenshot.filename)
+        unique_filename = generate_unique_filename(upload_screenshot.filename)
+        upload_screenshot.save(os.path.join(app.config['UPLOAD_FOLDER'],unique_filename ))
+        image_url = request.url_root + url_for('static', filename=f'uploads/{unique_filename}')
+    else:
+        image_url = None
+
+
     db = get_database()
-    db.execute("INSERT INTO contact_us (user_id, user_name, subject, message, upload_screenshot, status) VALUES (?, ?, ?, ?, ?, ?)", [user_id, user_name, subject, message, upload_screenshot, status])
+    db.execute("INSERT INTO contact_us (user_id, user_name, subject, message,  status, image_url) VALUES (?, ?, ?, ?, ?, ? )", [user_id, user_name, subject, message, status, image_url])
     db.commit()
     return jsonify({"Message": "Contact us entry successfully inserted."})
+
+@app.route("/updateSiteSettings", methods=["PUT"])
+def updatesitesettings():
+    companyName = request.form.get('companyName')
+    addressLine1 = request.form.get('addressLine1')
+    addressLine2 = request.form.get('addressLine2')
+    phoneNumber = request.form.get('phoneNumber')
+    emailId = request.form.get('emailId')
+    colorMode = request.form.get('colorMode')
+    header1 = request.form.get('header1')
+    subtitle1 = request.form.get('subtitle1')
+    contactHeading = request.form.get('contactHeading')
+    contactPerson = request.form.get('contactPerson')
+    pageheader1 = request.form.get('pageheader1')
+    pageSubtitle1 = request.form.get('pageSubtitle1')
+    registerBtntxt = request.form.get('registerBtntxt')
+    loginBtntxt = request.form.get('loginBtntxt')
+
+    db = get_database()
+
+    darkLogo = request.files.get('darkLogo')
+    dark_logo_url = None
+    if darkLogo and darkLogo.filename != '':
+        unique_filename = generate_unique_filename(darkLogo.filename)
+        darkLogo.save(os.path.join(app.config['UPLOAD_FOLDER'], unique_filename))
+        dark_logo_url = request.url_root + url_for('static', filename=f'uploads/{unique_filename}')
+
+    lightLogo = request.files.get('lightLogo')
+    light_logo_url = None
+    if lightLogo and lightLogo.filename != '':
+        unique_filename = generate_unique_filename(lightLogo.filename)
+        lightLogo.save(os.path.join(app.config['UPLOAD_FOLDER'], unique_filename))
+        light_logo_url = request.url_root + url_for('static', filename=f'uploads/{unique_filename}')
+
+    db.execute("""
+        UPDATE site_settings SET 
+        companyName = ?, 
+        dark_logo_url = COALESCE(?, dark_logo_url), 
+        light_logo_url = COALESCE(?, light_logo_url), 
+        address_line1 = ?, 
+        address_line2 = ?, 
+        contact_person = ?, 
+        phonenumber = ?, 
+        emailID = ?, 
+        defaultColorMode = ?, 
+        header1 = ?, 
+        subtitle1 = ?, 
+        contact_heading = ?, 
+        page_header = ?, 
+        page_subtitle = ?, 
+        register_button_text = ?, 
+        login_button_text = ?
+        """, [
+        companyName, dark_logo_url, light_logo_url, addressLine1, addressLine2, contactPerson,
+        phoneNumber, emailId, colorMode, header1, subtitle1, contactHeading, pageheader1,
+        pageSubtitle1, registerBtntxt, loginBtntxt
+    ])
+
+    db.commit()
+    return jsonify({"Message": "Settings updated successfully."})
+
+
+@app.route("/showallsiteSettings", methods=["GET"])
+def showallsiteSettings():
+    allsettings = None
+    db = get_database()
+    settings_cursor = db.execute("SELECT * FROM site_settings")
+    allsettings = settings_cursor.fetchone()
+
+    return jsonify({
+        'companyName' : allsettings['companyName'],
+        'darkLogo' : allsettings['dark_logo_url'],
+        'lightLogo' : allsettings['light_logo_url'],
+        'addressLine1' : allsettings['address_line1'],
+        'addressLine2' : allsettings['address_line2'],
+        'phoneNumber' : allsettings['phonenumber'],
+        'emailId' : allsettings['emailId'],
+        'colorMode' : allsettings['defaultColorMode'],
+        'header1' : allsettings['header1'],
+        'subtitle1' : allsettings['subtitle1'],
+        'contactHeading' : allsettings['contact_heading'],
+        'contactPerson' : allsettings['contact_person'],
+        'pageheader1' : allsettings['page_header'],
+        'pageSubtitle1' : allsettings['page_subtitle'],
+        'registerBtntxt' : allsettings['register_button_text'],
+        'loginBtntxt' : allsettings['login_button_text']
+    })
+
 
 
 
